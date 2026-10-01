@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spacetime Shooter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #03030c;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        canvas {
+            display: block;
+            background: radial-gradient(circle at center, #0b0b26 0%, #020208 100%);
+        }
+        .glow-cyan { text-shadow: 0 0 10px rgba(6, 182, 212, 0.8), 0 0 20px rgba(6, 182, 212, 0.5); }
+        .glow-red { text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.5); }
+        .glow-green { text-shadow: 0 0 10px rgba(34, 197, 94, 0.8), 0 0 20px rgba(34, 197, 94, 0.5); }
+        .box-glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4), inset 0 0 15px rgba(6, 182, 212, 0.2);
+            border: 1px solid rgba(6, 182, 212, 0.6);
+        }
+        .box-glow-purple {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4), inset 0 0 20px rgba(168, 85, 247, 0.2);
+            border: 1px solid rgba(168, 85, 247, 0.6);
+        }
+        .box-glow-yellow {
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.5), inset 0 0 15px rgba(234, 179, 8, 0.2);
+            border: 1px solid rgba(234, 179, 8, 0.8);
+        }
+        @keyframes modalFade {
+            from { opacity: 0; transform: scale(0.9) translateY(-20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-animate {
+            animation: modalFade 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center relative overflow-hidden">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="w-full h-full absolute inset-0 z-0"></canvas>
+
+    <!-- Top Heads-Up Display (HUD) -->
+    <div id="hud" class="absolute top-0 left-0 w-full p-4 z-10 flex justify-between items-start pointer-events-none hidden">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl box-glow-cyan pointer-events-auto">
+                <span class="text-cyan-400 font-orbitron text-xs sm:text-sm">NYAWA:</span>
+                <div id="livesContainer" class="flex gap-1 text-red-500 text-lg sm:text-xl">
+                    ❤️ ❤️ ❤️
+                </div>
+            </div>
+            <div class="bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-xl box-glow-cyan text-xs text-cyan-300 font-orbitron">
+                RAKSASA DITEWAS: <span id="killCount" class="text-yellow-400 font-bold">0</span> / 15
+            </div>
+            <div class="bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-xl box-glow-purple text-xs text-purple-300 font-orbitron">
+                KUIZ DIJAWAB: <span id="quizCountText" class="text-purple-400 font-bold">0</span> / 3
+            </div>
+        </div>
+
+        <div class="text-center bg-slate-900/80 backdrop-blur-md px-6 py-2 rounded-xl box-glow-cyan">
+            <div class="text-xs text-slate-400 font-orbitron">SKOR</div>
+            <div id="scoreText" class="text-2xl font-bold font-orbitron text-yellow-400 glow-cyan">0</div>
+        </div>
+
+        <div class="flex flex-col items-end gap-2 pointer-events-auto">
+            <div class="bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-xl box-glow-yellow flex flex-col items-end gap-1">
+                <div class="text-xs text-yellow-400 font-orbitron font-bold flex items-center gap-1">
+                    ⚡ KUASA TERSEDIA: <span id="powerTypeStored" class="text-sm text-white font-black">TIADA</span>
+                </div>
+                <button id="usePowerBtn" class="px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 active:scale-95 text-slate-950 font-orbitron font-black text-xs sm:text-sm rounded-lg shadow-lg transition-all cursor-pointer border border-yellow-300">
+                    GUNA KUASA [ TEKAN E ]
+                </button>
+            </div>
+            <div id="activeBuffIndicator" class="hidden bg-emerald-950/90 border border-emerald-400 text-emerald-300 text-xs px-3 py-1 rounded-lg font-orbitron animate-pulse">
+                🔥 KUASA AKTIF!
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss Health Bar -->
+    <div id="bossHud" class="absolute top-16 left-1/2 -translate-x-1/2 w-11/12 max-w-xl z-10 pointer-events-none hidden">
+        <div class="bg-slate-900/90 border-2 border-red-500 p-3 rounded-xl shadow-2xl flex flex-col gap-1">
+            <div class="flex justify-between items-center text-xs sm:text-sm font-orbitron font-bold text-red-400">
+                <span class="flex items-center gap-1">⚠️ RAJA RAKSASA ANGKASA (BOSS 100 HP)</span>
+                <span id="bossHpText">100 / 100 HP</span>
+            </div>
+            <div class="w-full h-4 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-red-900">
+                <div id="bossHpBar" class="h-full bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 rounded-full transition-all duration-150" style="width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Touch Controls -->
+    <div id="touchControls" class="absolute bottom-4 left-0 w-full px-6 z-10 flex justify-between items-end pointer-events-none sm:hidden hidden">
+        <button id="touchFireBtn" class="pointer-events-auto w-20 h-20 bg-red-600/80 active:bg-red-500 text-white rounded-full font-orbitron font-black text-sm border-2 border-red-300 shadow-lg flex items-center justify-center">
+            TEMBAK
+        </button>
+
+        <button id="touchPowerBtn" class="pointer-events-auto w-16 h-16 bg-yellow-500/80 active:bg-yellow-400 text-slate-950 rounded-full font-orbitron font-black text-xs border-2 border-yellow-200 shadow-lg flex flex-col items-center justify-center">
+            <span>E</span>
+            <span class="text-[9px]">KUASA</span>
+        </button>
+    </div>
+
+    <!-- START SCREEN -->
+    <div id="startScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md p-6 text-center">
+        <h1 class="text-4xl sm:text-6xl font-black font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 mb-2 glow-cyan">
+            SPACETIME SHOOTER
+        </h1>
+        <p class="text-slate-300 max-w-md mb-6 text-sm sm:text-base">
+            Tembak raksasa angkasa, elak meteorid, jawab kuiz untuk pilih kuasa mega & dapat +1 nyawa, dan musnahkan Raja Boss!
+        </p>
+
+        <div class="bg-slate-900/90 p-5 rounded-xl box-glow-cyan max-w-md w-full mb-6 text-left text-xs sm:text-sm text-slate-300 space-y-2">
+            <div class="font-bold text-cyan-400 font-orbitron border-b border-slate-700 pb-1 mb-2">📜 PERATURAN PERMAINAN:</div>
+            <div>• <span class="text-slate-300 font-bold">Kapal Raksasa Hitam (Kecil):</span> 1 HP (Laju)</div>
+            <div>• <span class="text-red-500 font-bold">Kapal Merah Sederhana:</span> 3 HP (Tembak Perlahan)</div>
+            <div>• <span class="text-stone-400 font-bold">Meteorid Berapi:</span> Elak atau tembak halangan batu meteor!</div>
+            <div>• <span class="text-purple-400 font-bold">Kuiz Power-Up:</span> Muncul setiap <span class="text-yellow-300 font-bold">15 raksasa</span> ditewaskan.</div>
+            <div>• <span class="text-yellow-300 font-bold">Ganjaran Kuiz (Betul):</span> 
+                <br>&nbsp;&nbsp;❤ <b class="text-red-400">+1 NYAWA AUTOMATIK!</b>
+                <br>&nbsp;&nbsp;1. <b class="text-cyan-300">SHIELD + 3-TEMBAKAN SPREAD</b>
+                <br>&nbsp;&nbsp;2. <b class="text-pink-400">MEGA LASER (DAMAGE 5)</b>
+            </div>
+            <div>• <span class="text-amber-400 font-bold">Aktifkan Kuasa [Tekan E]:</span> Guna simpanan kuasa bila-bila masa!</div>
+            <div>• <span class="text-red-400 font-bold">Raja Boss (100 HP):</span> Muncul selepas jawab <span class="text-white font-bold">3 kali kuiz</span>!</div>
+        </div>
+
+        <button id="startBtn" class="px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-orbitron font-bold text-lg rounded-xl shadow-lg hover:shadow-cyan-500/50 transform hover:scale-105 transition-all cursor-pointer">
+            MULA PERMAINAN
+        </button>
+    </div>
+
+    <!-- QUIZ MODAL -->
+    <div id="quizModal" class="absolute inset-0 z-30 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 hidden">
+        <div class="bg-slate-900 border-2 border-purple-500/80 rounded-2xl p-6 sm:p-8 max-w-lg w-full box-glow-purple modal-animate text-center relative">
+            
+            <div id="quizStepQuestion">
+                <div class="inline-block bg-purple-900/60 text-purple-300 font-orbitron text-xs px-3 py-1 rounded-full border border-purple-500 mb-3">
+                    ⚡ CABARAN KUIZ UJI MINDA
+                </div>
+                <h2 class="text-2xl font-orbitron font-bold text-yellow-400 mb-2">Jawab Soalan Untuk Kuasa!</h2>
+                <p class="text-slate-300 text-xs sm:text-sm mb-6">Jawab betul untuk dapat <span class="text-red-400 font-bold">+1 Nyawa</span> & Pilih Kuasa Mega!</p>
+
+                <div id="quizQuestion" class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-lg sm:text-xl font-bold text-cyan-300 mb-6 font-orbitron">
+                    Soalan...
+                </div>
+
+                <div id="quizAnswers" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4"></div>
+            </div>
+
+            <div id="quizStepPower" class="hidden">
+                <div class="inline-block bg-emerald-900/60 text-emerald-300 font-orbitron text-xs px-3 py-1 rounded-full border border-emerald-500 mb-3">
+                    🎉 JAWAPAN BETUL! (+1 NYAWA)
+                </div>
+                <h2 class="text-2xl font-orbitron font-bold text-cyan-300 mb-2">Sila Pilih Kuasa Anda:</h2>
+                <p class="text-slate-300 text-xs mb-6">Kuasa akan disimpan. Tekan [E] dalam permainan untuk guna!</p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button id="choosePowerA" class="bg-slate-950 hover:bg-slate-800 border-2 border-cyan-500 hover:border-cyan-300 p-4 rounded-xl text-left flex flex-col gap-2 cursor-pointer transition-all">
+                        <div class="text-cyan-400 font-orbitron font-bold text-sm">🛡 KUASA A: SHIELD + 3 SPREAD</div>
+                        <div class="text-slate-400 text-xs">Perisai Kebal + Tembakan 3 Peluru Serentak!</div>
+                    </button>
+
+                    <button id="choosePowerB" class="bg-slate-950 hover:bg-slate-800 border-2 border-pink-500 hover:border-pink-300 p-4 rounded-xl text-left flex flex-col gap-2 cursor-pointer transition-all">
+                        <div class="text-pink-400 font-orbitron font-bold text-sm">💥 KUASA B: MEGA LASER</div>
+                        <div class="text-slate-400 text-xs">Laser Merah Gergasi Berkuasa Tinggi! (Damage 5).</div>
+                    </button>
+                </div>
+            </div>
+
+            <div id="quizFeedback" class="hidden text-sm font-bold font-orbitron mt-4 py-2 rounded-lg"></div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / VICTORY OVERLAY -->
+    <div id="gameOverScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-6 text-center hidden">
+        <h2 id="endTitle" class="text-5xl font-black font-orbitron text-red-500 glow-red mb-2">GAME OVER</h2>
+        <p id="endSubtitle" class="text-slate-300 text-lg mb-6">Kapal anda telah dimusnahkan!</p>
+
+        <div class="bg-slate-900/90 p-6 rounded-2xl box-glow-cyan max-w-sm w-full mb-8 text-center">
+            <div class="text-xs text-slate-400 font-orbitron mb-1">JUMLAH SKOR AKHIR</div>
+            <div id="finalScore" class="text-4xl font-black font-orbitron text-yellow-400 mb-4">0</div>
+            
+            <div class="text-xs text-slate-400 font-orbitron mb-1">RAKSASA DITEWASKAN</div>
+            <div id="finalKills" class="text-xl font-bold font-orbitron text-cyan-400 mb-2">0</div>
+
+            <div class="text-xs text-slate-400 font-orbitron mb-1">KUIZ DIJAWAB</div>
+            <div id="finalQuizzes" class="text-lg font-bold font-orbitron text-purple-400">0 / 3</div>
+        </div>
+
+        <button id="restartBtn" class="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-orbitron font-bold text-lg rounded-xl shadow-lg hover:shadow-green-500/50 transform hover:scale-105 transition-all cursor-pointer">
+            MAIN SEMULA
+        </button>
+    </div>
+
+    <script>
+        // Web Audio Synthesizer
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playLaserSound(isMega = false) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = isMega ? 'sawtooth' : 'sine';
+                osc.frequency.setValueAtTime(isMega ? 350 : 850, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(isMega ? 80 : 150, audioCtx.currentTime + (isMega ? 0.3 : 0.12));
+                gain.gain.setValueAtTime(isMega ? 0.4 : 0.15, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + (isMega ? 0.3 : 0.12));
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + (isMega ? 0.3 : 0.12));
+            } catch(e){}
+        }
+
+        function playExplosionSound(isBig = false) {
+            if (!audioCtx) return;
+            try {
+                const dur = isBig ? 0.6 : 0.25;
+                const bufferSize = audioCtx.sampleRate * dur;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(isBig ? 250 : 600, audioCtx.currentTime);
+                filter.frequency.linearRampToValueAtTime(30, audioCtx.currentTime + dur);
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(isBig ? 0.5 : 0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start();
+            } catch(e){}
+        }
+
+        function playPowerupSound() {
+            if (!audioCtx) return;
+            try {
+                const notes = [260, 330, 440, 554, 659, 880];
+                notes.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.05);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime + idx * 0.05);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.05 + 0.1);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(audioCtx.currentTime + idx * 0.05);
+                    osc.stop(audioCtx.currentTime + idx * 0.05 + 0.1);
+                });
+            } catch(e){}
+        }
+
+        function playWrongSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(110, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+            } catch(e){}
+        }
+
+        // Senarai Soalan Kuiz
+        const quizBank = [
+            { 
+                q: "What is the meaning of “85% accuracy”?", 
+                a: ["The model predicts correctly about 85 out of 100 times", "The dataset has 85 rows", "The model uses 85% data"], 
+                correct: 0 
+            },
+            { 
+                q: "Which of the following is NOT part of model building?", 
+                a: ["Data collection", "Feature selection", "Prediction testing"], 
+                correct: 0 
+            },
+            { 
+                q: "In machine learning, the term “features” refers to:", 
+                a: ["Variables or input attributes used to help the model make predictions", "The accuracy percentage achieved after training", "The final prediction produced by the model", "The programming language used to build the algorithm"], 
+                correct: 0 
+            }
+        ];
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameState = 'START';
+        let score = 0;
+        let totalKills = 0;
+        let killsForQuiz = 0;
+        let quizzesAnswered = 0;
+        let currentQuizIndex = 0;
+        
+        let storedPowerType = null;
+        let activePowerType = null; 
+        let powerActiveEndTime = 0;
+
+        let lives = 3;
+        let lastShootTime = 0;
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const keys = {};
+        const touchPos = { x: null, y: null, active: false };
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            initAudio();
+
+            if ((e.code === 'KeyE' || e.key === 'e' || e.key === 'E') && gameState === 'PLAYING') {
+                activatePowerUp();
+            }
+        });
+        window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+        canvas.addEventListener('touchstart', e => {
+            initAudio();
+            touchPos.active = true;
+            touchPos.x = e.touches[0].clientX;
+            touchPos.y = e.touches[0].clientY;
+        });
+        canvas.addEventListener('touchmove', e => {
+            if (touchPos.active) {
+                touchPos.x = e.touches[0].clientX;
+                touchPos.y = e.touches[0].clientY;
+            }
+        });
+        canvas.addEventListener('touchend', () => { touchPos.active = false; });
+
+        canvas.addEventListener('mousemove', e => {
+            if (gameState === 'PLAYING') {
+                player.x = e.clientX;
+                player.y = e.clientY - 20;
+            }
+        });
+
+        document.getElementById('usePowerBtn').onclick = () => { activatePowerUp(); };
+        document.getElementById('touchPowerBtn').onclick = () => { activatePowerUp(); };
+
+        let touchFireActive = false;
+        const touchFireBtn = document.getElementById('touchFireBtn');
+        touchFireBtn.addEventListener('touchstart', (e) => { e.preventDefault(); touchFireActive = true; });
+        touchFireBtn.addEventListener('touchend', (e) => { e.preventDefault(); touchFireActive = false; });
+
+        // KAPAL TERBANG PEMAIN (KUNING-EMAS)
+        class Player {
+            constructor() {
+                this.x = width / 2;
+                this.y = height - 100;
+                this.radius = 28;
+                this.speed = 8;
+            }
+
+            update() {
+                if (keys['ArrowLeft'] || keys['KeyA']) this.x -= this.speed;
+                if (keys['ArrowRight'] || keys['KeyD']) this.x += this.speed;
+                if (keys['ArrowUp'] || keys['KeyW']) this.y -= this.speed;
+                if (keys['ArrowDown'] || keys['KeyS']) this.y += this.speed;
+
+                this.x = Math.max(this.radius, Math.min(width - this.radius, this.x));
+                this.y = Math.max(this.radius + 60, Math.min(height - this.radius, this.y));
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                const isShieldActive = (activePowerType === 'SHIELD_3WAY' && Date.now() < powerActiveEndTime);
+
+                if (isShieldActive) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius + 22, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(6, 182, 212, 0.25)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#22d3ee';
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 15;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                // Ekzos/Thrusters
+                const flameLength = Math.random() * 15 + 15;
+                ctx.fillStyle = '#38bdf8';
+                ctx.shadowColor = '#0284c7';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(-12, 25);
+                ctx.lineTo(-6, 25 + flameLength);
+                ctx.lineTo(0, 25);
+                ctx.moveTo(12, 25);
+                ctx.lineTo(6, 25 + flameLength);
+                ctx.lineTo(0, 25);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(-10, 25);
+                ctx.lineTo(-6, 25 + flameLength * 0.6);
+                ctx.lineTo(-2, 25);
+                ctx.moveTo(10, 25);
+                ctx.lineTo(6, 25 + flameLength * 0.6);
+                ctx.lineTo(2, 25);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Sayap Luar Kuning Emas
+                ctx.fillStyle = '#eab308';
+                ctx.strokeStyle = '#ca8a04';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, -35);
+                ctx.lineTo(-12, -10);
+                ctx.lineTo(-35, 15);
+                ctx.lineTo(-38, 30);
+                ctx.lineTo(-24, 22);
+                ctx.lineTo(-10, 18);
+                ctx.lineTo(0, 22);
+                ctx.lineTo(10, 18);
+                ctx.lineTo(24, 22);
+                ctx.lineTo(38, 30);
+                ctx.lineTo(35, 15);
+                ctx.lineTo(12, -10);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Kemasan Badan/Perisai Hitam-Kelabu
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.moveTo(0, -30);
+                ctx.lineTo(-10, -5);
+                ctx.lineTo(-22, 18);
+                ctx.lineTo(-8, 15);
+                ctx.lineTo(0, 18);
+                ctx.lineTo(8, 15);
+                ctx.lineTo(22, 18);
+                ctx.lineTo(10, -5);
+                ctx.closePath();
+                ctx.fill();
+
+                // Laras Senjata Tepi
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(-28, -8, 4, 25);
+                ctx.fillRect(24, -8, 4, 25);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(-28, -12, 4, 5);
+                ctx.fillRect(24, -12, 4, 5);
+
+                // Kokpit Biru Bersinar
+                ctx.fillStyle = '#38bdf8';
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.ellipse(0, -5, 6, 14, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Garisan Berkilau Kokpit
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.ellipse(-1, -8, 2, 6, -0.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, vx = 0, vy = -12, damage = 1, isMegaLaser = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = isMegaLaser ? 14 : 5;
+                this.damage = damage;
+                this.isMegaLaser = isMegaLaser;
+                this.markedForDeletion = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y < -30 || this.x < -30 || this.x > width + 30 || this.y > height + 30) {
+                    this.markedForDeletion = true;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                if (this.isMegaLaser) {
+                    ctx.rect(this.x - 12, this.y - 20, 24, 40);
+                    ctx.fillStyle = '#ec4899';
+                    ctx.shadowColor = '#f43f5e';
+                    ctx.shadowBlur = 15;
+                } else {
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.damage > 1 ? '#eab308' : '#38bdf8';
+                    ctx.shadowColor = '#38bdf8';
+                    ctx.shadowBlur = 8;
+                }
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Meteorid {
+            constructor() {
+                this.x = Math.random() * (width - 40) + 20;
+                this.y = -50;
+                this.radius = Math.random() * 12 + 18;
+                this.speedY = Math.random() * 2 + 1.5;
+                this.speedX = (Math.random() - 0.5) * 1.5;
+                this.hp = 2;
+                this.rotation = 0;
+                this.rotSpeed = (Math.random() - 0.5) * 0.05;
+                this.markedForDeletion = false;
+                
+                this.points = [];
+                const numPoints = Math.floor(Math.random() * 4) + 6;
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i / numPoints) * Math.PI * 2;
+                    const dist = this.radius * (0.65 + Math.random() * 0.5);
+                    this.points.push({
+                        x: Math.cos(angle) * dist,
+                        y: Math.sin(angle) * dist
+                    });
+                }
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.rotation += this.rotSpeed;
+
+                if (Math.random() < 0.6) {
+                    particles.push(new Particle(
+                        this.x + (Math.random() - 0.5) * this.radius,
+                        this.y - this.radius * 0.5,
+                        Math.random() < 0.5 ? '#f97316' : '#eab308'
+                    ));
+                }
+
+                if (this.y > height + 60) this.markedForDeletion = true;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                ctx.beginPath();
+                ctx.arc(0, -5, this.radius + 8, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(249, 115, 22, 0.3)';
+                ctx.fill();
+
+                ctx.rotate(this.rotation);
+
+                ctx.beginPath();
+                ctx.moveTo(this.points[0].x, this.points[0].y);
+                for (let i = 1; i < this.points.length; i++) {
+                    ctx.lineTo(this.points[i].x, this.points[i].y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = '#451a03';
+                ctx.fill();
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(this.points[0].x * 0.4, this.points[0].y * 0.4);
+                ctx.lineTo(this.points[2].x * 0.6, this.points[2].y * 0.6);
+                ctx.lineTo(this.points[4].x * 0.3, this.points[4].y * 0.3);
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        // RAKSASA ANGKASA
+        class Enemy {
+            constructor(type = 'small') {
+                this.type = type;
+                this.x = Math.random() * (width - 100) + 50;
+                this.y = -60;
+                this.markedForDeletion = false;
+                this.animFrame = Math.random() * 100;
+                this.lastShootTime = 0;
+
+                if (type === 'small') {
+                    this.hp = 1;
+                    this.maxHp = 1;
+                    this.radius = 22;
+                    this.speedY = Math.random() * 2 + 2.2;
+                    this.speedX = (Math.random() - 0.5) * 1.5;
+                    this.scoreValue = 10;
+                    this.color = '#3f3f46';
+                } else if (type === 'medium') {
+                    this.hp = 3;
+                    this.maxHp = 3;
+                    this.radius = 34;
+                    this.speedY = Math.random() * 0.8 + 0.8;
+                    this.speedX = (Math.random() - 0.5) * 0.8;
+                    this.scoreValue = 35;
+                    this.color = '#b91c1c';
+                } else if (type === 'boss') {
+                    this.hp = 100;
+                    this.maxHp = 100;
+                    this.radius = 85;
+                    this.x = width / 2;
+                    this.y = -120;
+                    this.targetY = 140;
+                    this.speedX = 1.8;
+                    this.speedY = 0.6;
+                    this.scoreValue = 1000;
+                    this.color = '#dc2626';
+                    this.lastBossAttack = 0;
+                }
+            }
+
+            update() {
+                this.animFrame += 0.08;
+                const now = Date.now();
+
+                if (this.type === 'boss') {
+                    if (this.y < this.targetY) {
+                        this.y += this.speedY;
+                    } else {
+                        this.x += this.speedX;
+                        if (this.x - this.radius < 20 || this.x + this.radius > width - 20) {
+                            this.speedX *= -1;
+                        }
+
+                        if (now - this.lastBossAttack > 1400) {
+                            this.lastBossAttack = now;
+                            this.shootBoss();
+                        }
+                    }
+                } else {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+
+                    // Kapal Sederhana kini boleh menembak peluru yang tidak laju
+                    if (this.type === 'medium' && this.y > 0 && this.y < height - 100) {
+                        if (now - this.lastShootTime > 2200) {
+                            this.lastShootTime = now;
+                            this.shootMedium();
+                        }
+                    }
+
+                    if (this.y > height + 60) this.markedForDeletion = true;
+                }
+            }
+
+            shootMedium() {
+                // Tembakan perlahan untuk enemy sederhana (vy = 3.5)
+                enemyBullets.push(new EnemyBullet(this.x, this.y + 25, 0, 3.5));
+            }
+
+            shootBoss() {
+                enemyBullets.push(new EnemyBullet(this.x - 45, this.y + 30, -2.5, 6));
+                enemyBullets.push(new EnemyBullet(this.x - 15, this.y + 50, -0.8, 7));
+                enemyBullets.push(new EnemyBullet(this.x + 15, this.y + 50, 0.8, 7));
+                enemyBullets.push(new EnemyBullet(this.x + 45, this.y + 30, 2.5, 6));
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                if (this.type === 'boss') {
+                    // RAJA BOSS ANGKASA
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 25;
+                    
+                    ctx.fillStyle = '#1e3a8a';
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 3;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, 65);
+                    ctx.lineTo(-30, 45);
+                    ctx.lineTo(-65, 55);
+                    ctx.lineTo(-95, 10);
+                    ctx.lineTo(-100, -40);
+                    ctx.lineTo(-60, -70);
+                    ctx.lineTo(-25, -55);
+                    ctx.lineTo(0, -75);
+                    ctx.lineTo(25, -55);
+                    ctx.lineTo(60, -70);
+                    ctx.lineTo(100, -40);
+                    ctx.lineTo(95, 10);
+                    ctx.lineTo(65, 55);
+                    ctx.lineTo(30, 45);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#2563eb';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 40);
+                    ctx.lineTo(-40, 20);
+                    ctx.lineTo(-75, -10);
+                    ctx.lineTo(-45, -45);
+                    ctx.lineTo(0, -25);
+                    ctx.lineTo(45, -45);
+                    ctx.lineTo(75, -10);
+                    ctx.lineTo(40, 20);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#f97316';
+                    ctx.shadowColor = '#f97316';
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.moveTo(-100, -40);
+                    ctx.lineTo(-85, -20);
+                    ctx.lineTo(-60, -45);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(100, -40);
+                    ctx.lineTo(85, -20);
+                    ctx.lineTo(60, -45);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ef4444';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.moveTo(-25, -20);
+                    ctx.lineTo(-5, -30);
+                    ctx.lineTo(-12, -10);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(25, -20);
+                    ctx.lineTo(5, -30);
+                    ctx.lineTo(12, -10);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ff6b00';
+                    ctx.shadowColor = '#f97316';
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(0, 10, 18, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffe600';
+                    ctx.beginPath();
+                    ctx.arc(0, 10, 9, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else if (this.type === 'small') {
+                    // DESAIN BARU: KAPAL KECIL WARNA HITAM
+                    ctx.rotate(Math.PI);
+
+                    // Ekzos Merah
+                    const flameLength = Math.random() * 10 + 8;
+                    ctx.fillStyle = '#ef4444';
+                    ctx.shadowColor = '#dc2626';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(-5, 18);
+                    ctx.lineTo(0, 18 + flameLength);
+                    ctx.lineTo(5, 18);
+                    ctx.fill();
+
+                    // Sayap Hitam Tajam
+                    ctx.fillStyle = '#18181b';
+                    ctx.strokeStyle = '#3f3f46';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -22);
+                    ctx.lineTo(-18, 8);
+                    ctx.lineTo(-24, 18);
+                    ctx.lineTo(-8, 12);
+                    ctx.lineTo(0, 16);
+                    ctx.lineTo(8, 12);
+                    ctx.lineTo(24, 18);
+                    ctx.lineTo(18, 8);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Panel Bodi Hitam Pekat
+                    ctx.fillStyle = '#09090b';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -18);
+                    ctx.lineTo(-7, -2);
+                    ctx.lineTo(-12, 10);
+                    ctx.lineTo(0, 12);
+                    ctx.lineTo(12, 10);
+                    ctx.lineTo(7, -2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Kokpit Merah/Perak Bersinar
+                    ctx.fillStyle = '#ef4444';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 6;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -3, 3, 8, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                } else if (this.type === 'medium') {
+                    // DESAIN BARU: KAPAL SEDERHANA RED & BLACK DENGAN SAYAP BERKEMBAR
+                    ctx.rotate(Math.PI);
+
+                    // Dual Ekzos
+                    const flameLength = Math.random() * 12 + 10;
+                    ctx.fillStyle = '#f97316';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(-14, 24);
+                    ctx.lineTo(-8, 24 + flameLength);
+                    ctx.lineTo(-2, 24);
+                    ctx.moveTo(2, 24);
+                    ctx.lineTo(8, 24 + flameLength);
+                    ctx.lineTo(14, 24);
+                    ctx.fill();
+
+                    // Sayap Utama Lebar (Merah Gelap)
+                    ctx.fillStyle = '#991b1b';
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -38);
+                    ctx.lineTo(-15, -15);
+                    ctx.lineTo(-42, 10);
+                    ctx.lineTo(-44, 28);
+                    ctx.lineTo(-26, 20);
+                    ctx.lineTo(-12, 18);
+                    ctx.lineTo(0, 24);
+                    ctx.lineTo(12, 18);
+                    ctx.lineTo(26, 20);
+                    ctx.lineTo(44, 28);
+                    ctx.lineTo(42, 10);
+                    ctx.lineTo(15, -15);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Sayap Sisi Atas/Sub-Wings (Hitam Krimson)
+                    ctx.fillStyle = '#450a0a';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -28);
+                    ctx.lineTo(-22, -2);
+                    ctx.lineTo(-32, 16);
+                    ctx.lineTo(-10, 10);
+                    ctx.lineTo(0, 14);
+                    ctx.lineTo(10, 10);
+                    ctx.lineTo(32, 16);
+                    ctx.lineTo(22, -2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Laras Senjata Tembakan
+                    ctx.fillStyle = '#78716c';
+                    ctx.fillRect(-2, -32, 4, 12);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(-2, -35, 4, 4);
+
+                    // Kokpit Oren Bersinar
+                    ctx.fillStyle = '#f97316';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -6, 5, 12, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.ellipse(-1, -9, 2, 5, -0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Bar Nyawa Raksasa Sederhana
+                    ctx.rotate(Math.PI);
+                    const barW = 36;
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(-barW/2, -45, barW, 4);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillRect(-barW/2, -45, (this.hp / this.maxHp) * barW, 4);
+                }
+
+                ctx.restore();
+            }
+        }
+
+        class EnemyBullet {
+            constructor(x, y, vx, vy) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = 6;
+                this.markedForDeletion = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.y > height + 20 || this.x < -20 || this.x > width + 20) {
+                    this.markedForDeletion = true;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ef4444';
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 3.5 + 1;
+                this.vx = (Math.random() - 0.5) * 7;
+                this.vy = (Math.random() - 0.5) * 7;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015;
+                this.markedForDeletion = false;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+                if (this.alpha <= 0) this.markedForDeletion = true;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Bintang Angkasa
+        const stars = Array.from({ length: 140 }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 1.8 + 0.5
+        }));
+
+        let player = new Player();
+        let bullets = [];
+        let enemies = [];
+        let meteorids = [];
+        let enemyBullets = [];
+        let particles = [];
+        let activeBoss = null;
+
+        function spawnEnemiesAndHazards() {
+            if (activeBoss || gameState !== 'PLAYING') return;
+
+            if (Math.random() < 0.038) {
+                const isMedium = Math.random() < 0.35;
+                enemies.push(new Enemy(isMedium ? 'medium' : 'small'));
+            }
+
+            if (Math.random() < 0.018) {
+                meteorids.push(new Meteorid());
+            }
+        }
+
+        function spawnBoss() {
+            if (activeBoss) return;
+            activeBoss = new Enemy('boss');
+            enemies.push(activeBoss);
+            document.getElementById('bossHud').classList.remove('hidden');
+            updateBossHpUI();
+        }
+
+        function createExplosion(x, y, color = '#f97316', count = 25) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function updateBossHpUI() {
+            if (!activeBoss) return;
+            const percentage = Math.max(0, (activeBoss.hp / activeBoss.maxHp) * 100);
+            document.getElementById('bossHpBar').style.width = percentage + '%';
+            document.getElementById('bossHpText').innerText = `${Math.max(0, activeBoss.hp)} / ${activeBoss.maxHp} HP`;
+        }
+
+        function activatePowerUp() {
+            if (storedPowerType && gameState === 'PLAYING') {
+                activePowerType = storedPowerType;
+                storedPowerType = null;
+                document.getElementById('powerTypeStored').innerText = 'TIADA';
+                powerActiveEndTime = Date.now() + 10000;
+                playPowerupSound();
+            }
+        }
+
+        function handleShooting() {
+            const now = Date.now();
+            const isPowerActive = now < powerActiveEndTime;
+            const isMega = (activePowerType === 'MEGA_LASER' && isPowerActive);
+            const is3Way = (activePowerType === 'SHIELD_3WAY' && isPowerActive);
+
+            const cooldown = isMega ? 280 : (is3Way ? 140 : 220);
+            const isShootingRequested = keys['Space'] || touchPos.active || touchFireActive;
+
+            if (isShootingRequested && now - lastShootTime > cooldown) {
+                lastShootTime = now;
+
+                if (isMega) {
+                    bullets.push(new Bullet(player.x, player.y - 30, 0, -15, 5, true));
+                    playLaserSound(true);
+                } else if (is3Way) {
+                    bullets.push(new Bullet(player.x, player.y - 20, 0, -12, 1));
+                    bullets.push(new Bullet(player.x - 14, player.y - 10, -3, -11, 1));
+                    bullets.push(new Bullet(player.x + 14, player.y - 10, 3, -11, 1));
+                    playLaserSound(false);
+                } else {
+                    bullets.push(new Bullet(player.x, player.y - 20, 0, -12, 1));
+                    playLaserSound(false);
+                }
+            }
+        }
+
+        function checkCollisions() {
+            bullets.forEach(bullet => {
+                enemies.forEach(enemy => {
+                    const dist = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+                    if (dist < bullet.radius + enemy.radius) {
+                        bullet.markedForDeletion = true;
+                        enemy.hp -= bullet.damage;
+                        createExplosion(bullet.x, bullet.y, '#38bdf8', 6);
+
+                        if (enemy.type === 'boss') updateBossHpUI();
+
+                        if (enemy.hp <= 0) {
+                            enemy.markedForDeletion = true;
+                            createExplosion(enemy.x, enemy.y, enemy.color, enemy.type === 'boss' ? 90 : 25);
+                            playExplosionSound(enemy.type === 'boss');
+
+                            score += enemy.scoreValue;
+                            document.getElementById('scoreText').innerText = score;
+
+                            if (enemy.type === 'boss') {
+                                activeBoss = null;
+                                document.getElementById('bossHud').classList.add('hidden');
+                                triggerVictory();
+                            } else {
+                                totalKills++;
+                                killsForQuiz++;
+                                document.getElementById('killCount').innerText = killsForQuiz;
+
+                                if (killsForQuiz >= 15) {
+                                    killsForQuiz = 0;
+                                    document.getElementById('killCount').innerText = killsForQuiz;
+                                    triggerQuizModal();
+                                }
+                            }
+                        }
+                    }
+                });
+
+                meteorids.forEach(m => {
+                    const dist = Math.hypot(bullet.x - m.x, bullet.y - m.y);
+                    if (dist < bullet.radius + m.radius) {
+                        bullet.markedForDeletion = true;
+                        m.hp -= bullet.damage;
+                        createExplosion(bullet.x, bullet.y, '#f97316', 5);
+                        if (m.hp <= 0) {
+                            m.markedForDeletion = true;
+                            createExplosion(m.x, m.y, '#eab308', 18);
+                            playExplosionSound(false);
+                        }
+                    }
+                });
+            });
+
+            if (gameState === 'PLAYING') {
+                const isShieldActive = (activePowerType === 'SHIELD_3WAY' && Date.now() < powerActiveEndTime);
+
+                enemies.forEach(enemy => {
+                    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                    if (dist < player.radius + enemy.radius) {
+                        if (enemy.type !== 'boss') enemy.markedForDeletion = true;
+                        if (!isShieldActive) hitPlayer();
+                        else createExplosion(player.x, player.y, '#38bdf8', 15);
+                    }
+                });
+
+                meteorids.forEach(m => {
+                    const dist = Math.hypot(player.x - m.x, player.y - m.y);
+                    if (dist < player.radius + m.radius) {
+                        m.markedForDeletion = true;
+                        if (!isShieldActive) hitPlayer();
+                        else createExplosion(player.x, player.y, '#38bdf8', 15);
+                    }
+                });
+
+                enemyBullets.forEach(eb => {
+                    const dist = Math.hypot(player.x - eb.x, player.y - eb.y);
+                    if (dist < player.radius + eb.radius) {
+                        eb.markedForDeletion = true;
+                        if (!isShieldActive) hitPlayer();
+                        else createExplosion(player.x, player.y, '#38bdf8', 15);
+                    }
+                });
+            }
+        }
+
+        function hitPlayer() {
+            lives--;
+            updateLivesUI();
+            createExplosion(player.x, player.y, '#ef4444', 35);
+            playExplosionSound(true);
+
+            if (lives <= 0) triggerGameOver();
+        }
+
+        function updateLivesUI() {
+            const container = document.getElementById('livesContainer');
+            let hearts = '';
+            for (let i = 0; i < lives; i++) hearts += '❤ ';
+            container.innerHTML = hearts || '💀';
+        }
+
+        function triggerQuizModal() {
+            gameState = 'QUIZ';
+            document.getElementById('quizStepQuestion').classList.remove('hidden');
+            document.getElementById('quizStepPower').classList.add('hidden');
+            document.getElementById('quizFeedback').classList.add('hidden');
+
+            const quizModal = document.getElementById('quizModal');
+            
+            const quiz = quizBank[currentQuizIndex % quizBank.length];
+            currentQuizIndex++;
+
+            document.getElementById('quizQuestion').innerText = quiz.q;
+
+            const answersContainer = document.getElementById('quizAnswers');
+            answersContainer.innerHTML = '';
+
+            quiz.a.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl font-orbitron text-cyan-300 font-bold hover:border-cyan-400 transition-all text-sm cursor-pointer";
+                btn.innerText = opt;
+                btn.onclick = () => answerQuiz(idx === quiz.correct, btn);
+                answersContainer.appendChild(btn);
+            });
+
+            quizModal.classList.remove('hidden');
+        }
+
+        function answerQuiz(isCorrect, selectedBtn) {
+            const feedbackEl = document.getElementById('quizFeedback');
+            feedbackEl.classList.remove('hidden');
+
+            const btns = document.querySelectorAll('#quizAnswers button');
+            btns.forEach(b => b.disabled = true);
+
+            quizzesAnswered++;
+            document.getElementById('quizCountText').innerText = quizzesAnswered;
+
+            if (isCorrect) {
+                lives++;
+                updateLivesUI();
+
+                selectedBtn.classList.add('bg-green-600', 'text-white');
+                feedbackEl.className = "text-center text-green-400 bg-green-950/80 border border-green-500 py-2 rounded-lg font-orbitron mt-3";
+                feedbackEl.innerText = "JAWAPAN BETUL! (+1 NYAWA) Sila pilih kuasa anda...";
+                playPowerupSound();
+
+                setTimeout(() => {
+                    document.getElementById('quizStepQuestion').classList.add('hidden');
+                    document.getElementById('quizStepPower').classList.remove('hidden');
+                    feedbackEl.classList.add('hidden');
+                }, 1200);
+            } else {
+                selectedBtn.classList.add('bg-red-600', 'text-white');
+                feedbackEl.className = "text-center text-red-400 bg-red-950/80 border border-red-500 py-2 rounded-lg font-orbitron mt-3";
+                feedbackEl.innerText = "JAWAPAN SALAH! Tiada kuasa atau nyawa disimpan.";
+                playWrongSound();
+
+                setTimeout(() => {
+                    closeQuizAndResume();
+                }, 1800);
+            }
+        }
+
+        document.getElementById('choosePowerA').onclick = () => {
+            storedPowerType = 'SHIELD_3WAY';
+            document.getElementById('powerTypeStored').innerText = 'SHIELD + 3WAY';
+            closeQuizAndResume();
+        };
+
+        document.getElementById('choosePowerB').onclick = () => {
+            storedPowerType = 'MEGA_LASER';
+            document.getElementById('powerTypeStored').innerText = 'MEGA LASER';
+            closeQuizAndResume();
+        };
+
+        function closeQuizAndResume() {
+            document.getElementById('quizModal').classList.add('hidden');
+            gameState = 'PLAYING';
+
+            if (quizzesAnswered >= 3 && !activeBoss) {
+                spawnBoss();
+            }
+        }
+
+        function triggerGameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('endTitle').innerText = "GAME OVER";
+            document.getElementById('endTitle').className = "text-5xl font-black font-orbitron text-red-500 glow-red mb-2";
+            document.getElementById('endSubtitle').innerText = "Kapal angkasa anda telah dimusnahkan!";
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalKills').innerText = totalKills;
+            document.getElementById('finalQuizzes').innerText = `${quizzesAnswered} / 3`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function triggerVictory() {
+            gameState = 'VICTORY';
+            document.getElementById('endTitle').innerText = "SYABAS! TAHNIAH!";
+            document.getElementById('endTitle').className = "text-5xl font-black font-orbitron text-green-400 glow-green mb-2";
+            document.getElementById('endSubtitle').innerText = "Anda telah mengalahkan Raja Boss Angkasa!";
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalKills').innerText = totalKills;
+            document.getElementById('finalQuizzes').innerText = `${quizzesAnswered} / 3`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            score = 0;
+            totalKills = 0;
+            killsForQuiz = 0;
+            quizzesAnswered = 0;
+            currentQuizIndex = 0;
+            storedPowerType = null;
+            activePowerType = null;
+            powerActiveEndTime = 0;
+            lives = 3;
+            bullets = [];
+            enemies = [];
+            meteorids = [];
+            enemyBullets = [];
+            particles = [];
+            activeBoss = null;
+
+            document.getElementById('scoreText').innerText = '0';
+            document.getElementById('killCount').innerText = '0';
+            document.getElementById('quizCountText').innerText = '0';
+            document.getElementById('powerTypeStored').innerText = 'TIADA';
+            document.getElementById('bossHud').classList.add('hidden');
+            updateLivesUI();
+
+            player = new Player();
+            gameState = 'PLAYING';
+
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('touchControls').classList.remove('hidden');
+        }
+
+        document.getElementById('startBtn').onclick = () => { initAudio(); resetGame(); };
+        document.getElementById('restartBtn').onclick = () => { initAudio(); resetGame(); };
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Pergerakan Bintang
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > height) star.y = 0;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            const activeBuffIndicator = document.getElementById('activeBuffIndicator');
+            if (Date.now() < powerActiveEndTime) {
+                activeBuffIndicator.classList.remove('hidden');
+                activeBuffIndicator.innerText = activePowerType === 'SHIELD_3WAY' ? '🛡️ SHIELD + 3WAY AKTIF' : '💥 MEGA LASER AKTIF';
+            } else {
+                activeBuffIndicator.classList.add('hidden');
+            }
+
+            if (gameState === 'PLAYING' || gameState === 'QUIZ') {
+                if (gameState === 'PLAYING') {
+                    player.update();
+                    handleShooting();
+                    spawnEnemiesAndHazards();
+                    checkCollisions();
+                }
+
+                player.draw();
+
+                bullets.forEach(b => { if (gameState === 'PLAYING') b.update(); b.draw(); });
+                bullets = bullets.filter(b => !b.markedForDeletion);
+
+                enemies.forEach(e => { if (gameState === 'PLAYING') e.update(); e.draw(); });
+                enemies = enemies.filter(e => !e.markedForDeletion);
+
+                meteorids.forEach(m => { if (gameState === 'PLAYING') m.update(); m.draw(); });
+                meteorids = meteorids.filter(m => !m.markedForDeletion);
+
+                enemyBullets.forEach(eb => { if (gameState === 'PLAYING') eb.update(); eb.draw(); });
+                enemyBullets = enemyBullets.filter(eb => !eb.markedForDeletion);
+
+                particles.forEach(p => { p.update(); p.draw(); });
+                particles = particles.filter(p => !p.markedForDeletion);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        window.onload = function() {
+            animate();
+        };
+    </script>
+</body>
+</html>
